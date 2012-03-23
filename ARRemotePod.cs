@@ -111,7 +111,7 @@ public class ARRemotePod : CommandPod
         RelayPath path = null;
         while (openSet.Count > 0)
         {
-            RelayNode current = fScore.Where((k,v) => openSet.Contains(k)).Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2).Key;
+            RelayNode current = fScore.Where(p => openSet.Contains(p.Key)).Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2).Key;
             if (current == goal)
             {
                 path = convertToPath(reconstructPath(cameFrom, cameFrom[goal]));
