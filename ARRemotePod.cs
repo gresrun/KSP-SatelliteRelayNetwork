@@ -21,7 +21,6 @@ public class ARRemotePod : CommandPod
     public String basePlanet = "Kerbin";
     public double baseLatitude = -0.340;
     public double baseLongitude = 27.620;
-    List<Vessel> comsatList;
 
     //you can use these public values to make your code react based on the comms state. for instance
     //you can write
@@ -36,7 +35,7 @@ public class ARRemotePod : CommandPod
     public double controlDelay = 0;    //round trip speed of light delay in seconds
 
     int ticksSinceContactCheck = 0;
-
+    List<Vessel> comsatList;
     FlightCtrlStateBuffer delayedBuffer = new FlightCtrlStateBuffer();
 
     protected override void onPartFixedUpdate()
