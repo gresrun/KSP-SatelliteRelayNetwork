@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,6 +21,7 @@ public class ARRemotePod : CommandPod
     public String basePlanet = "Kerbin";
     public double baseLatitude = -0.340;
     public double baseLongitude = 27.620;
+    List<Vessel> comsatList;
 
     //you can use these public values to make your code react based on the comms state. for instance
     //you can write
@@ -87,110 +88,137 @@ public class ARRemotePod : CommandPod
         return true;
     }
 
+    /* ZW: populateComsatList()
+     * takes no arguments
+     * 
+     * erases old list of comsats and scans the global flight list, repopulating the list
+     * and storing it for use in the findShortestRelayPath() method.
+     */
+    void populateComsatList()
+    {
+        // purge previous list
+        if (comsatList == null)
+        {
+            comsatList = new List<Vessel>();
+        }
+        else
+        {
+            comsatList.Clear();
+        }
+        // scan global flight list, add comsats to comsatList
+        foreach (Vessel v in FlightGlobals.Vessels)
+        {
+            if (isComsat(v))
+            {
+                comsatList.Add(v);
+            }
+        }
+    }
+
     RelayPath findShortestRelayPath()
     {
         Vector3d baseRelay = computeBaseRelayPosition();
-		
-		RelayNode goal = new RelayNode(baseRelay);
-		RelayNode start = new RelayNode(this.vessel);
-		double startBaseHeuristic = (start.Position - goal.Position).magnitude;
-		
+
+        RelayNode goal = new RelayNode(baseRelay);
+        RelayNode start = new RelayNode(this.vessel);
+        double startBaseHeuristic = (start.Position - goal.Position).magnitude;
+
         HashSet<RelayNode> closedSet = new HashSet<RelayNode>();
         HashSet<RelayNode> openSet = new HashSet<RelayNode>();
         openSet.Add(start);
-		
-		Dictionary<RelayNode,RelayNode> cameFrom = new Dictionary<RelayNode,RelayNode>();
-		Dictionary<RelayNode,double> gScore = new Dictionary<RelayNode,double>();
-		Dictionary<RelayNode,double> hScore = new Dictionary<RelayNode,double>();
-		Dictionary<RelayNode,double> fScore = new Dictionary<RelayNode,double>();
-		gScore.Add(start, 0.0);
-		hScore.Add(start, startBaseHeuristic);
-		fScore.Add(start, startBaseHeuristic);
-		
-		RelayPath path = null;
-		while (openSet.Count > 0)
-		{
-			RelayNode current = hScore.Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2).Key;
-			if (current == goal)
-			{
-				path = convertToPath(reconstructPath(cameFrom, cameFrom[goal]));
-				break;
-			}
-			openSet.Remove(current);
-			closedSet.Add(current);
-			foreach (Vessel v in FlightGlobals.Vessels)
-			{
-				if (isComsat(v) && lineOfSight(v.transform.position, current.Position))
-				{
-					RelayNode neighbor = new RelayNode(v);
-					if (!closedSet.Contains(neighbor))
-					{
-						double tentGScore = gScore[current] - (neighbor.Position - current.Position).magnitude;
-						bool tentIsBetter = false;
-						if (!openSet.Contains(neighbor))
-						{
-							openSet.Add(neighbor);
-							hScore.Add(neighbor, (neighbor.Position - goal.Position).magnitude);
-							tentIsBetter = true;
-						}
-						else if (tentGScore < gScore[neighbor])
-						{
-							tentIsBetter = true;
-						}
-						if (tentIsBetter)
-						{
-							cameFrom.Add(neighbor, current);
-							gScore.Add(neighbor, tentGScore);
-							fScore.Add(neighbor, tentGScore + hScore[neighbor]);
-						}
-					}
-				}
-			}
-		}
-		
-		return path;
+
+        Dictionary<RelayNode, RelayNode> cameFrom = new Dictionary<RelayNode, RelayNode>();
+        Dictionary<RelayNode, double> gScore = new Dictionary<RelayNode, double>();
+        Dictionary<RelayNode, double> hScore = new Dictionary<RelayNode, double>();
+        Dictionary<RelayNode, double> fScore = new Dictionary<RelayNode, double>();
+        gScore.Add(start, 0.0);
+        hScore.Add(start, startBaseHeuristic);
+        fScore.Add(start, startBaseHeuristic);
+
+        RelayPath path = null;
+        while (openSet.Count > 0)
+        {
+            RelayNode current = hScore.Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2).Key;
+            if (current == goal)
+            {
+                path = convertToPath(reconstructPath(cameFrom, cameFrom[goal]));
+                break;
+            }
+            openSet.Remove(current);
+            closedSet.Add(current);
+            foreach (Vessel v in comsatList)
+            {
+                if (isComsat(v) && lineOfSight(v.transform.position, current.Position))
+                {
+                    RelayNode neighbor = new RelayNode(v);
+                    if (!closedSet.Contains(neighbor))
+                    {
+                        double tentGScore = gScore[current] - (neighbor.Position - current.Position).magnitude;
+                        bool tentIsBetter = false;
+                        if (!openSet.Contains(neighbor))
+                        {
+                            openSet.Add(neighbor);
+                            hScore.Add(neighbor, (neighbor.Position - goal.Position).magnitude);
+                            tentIsBetter = true;
+                        }
+                        else if (tentGScore < gScore[neighbor])
+                        {
+                            tentIsBetter = true;
+                        }
+                        if (tentIsBetter)
+                        {
+                            cameFrom.Add(neighbor, current);
+                            gScore.Add(neighbor, tentGScore);
+                            fScore.Add(neighbor, tentGScore + hScore[neighbor]);
+                        }
+                    }
+                }
+            }
+        }
+
+        return path;
     }
-	
-	List<RelayNode> reconstructPath(Dictionary<RelayNode,RelayNode> cameFrom, RelayNode curNode)
-	{
-		List<RelayNode> tmp = null;
-		if (cameFrom.ContainsKey(curNode))
-		{
-			tmp = reconstructPath(cameFrom, cameFrom[curNode]);
-			tmp.Add(curNode);
-		}
-		else
-		{
-			tmp = new List<RelayNode>(){curNode};
-		}
-		return tmp;
-	}
-	
-	RelayPath convertToPath(List<RelayNode> nodes)
-	{
-		nodes.Reverse();
-		RelayPath path = new RelayPath(nodes[0].Vessel);
-		bool firstTime = true;
-		foreach (RelayNode node in nodes)
-		{
-			if (!firstTime)
-			{
-				if (node.IsBase)
-				{
-					path.terminate(node.Position);
-				}
-				else
-				{
-					path.Add(node.Vessel);
-				}
-			}
-			else
-			{
-				firstTime = false;
-			}
-		}
-		return path;
-	}
+
+    List<RelayNode> reconstructPath(Dictionary<RelayNode, RelayNode> cameFrom, RelayNode curNode)
+    {
+        List<RelayNode> tmp = null;
+        if (cameFrom.ContainsKey(curNode))
+        {
+            tmp = reconstructPath(cameFrom, cameFrom[curNode]);
+            tmp.Add(curNode);
+        }
+        else
+        {
+            tmp = new List<RelayNode>() { curNode };
+        }
+        return tmp;
+    }
+
+    RelayPath convertToPath(List<RelayNode> nodes)
+    {
+        nodes.Reverse();
+        RelayPath path = new RelayPath(nodes[0].Vessel);
+        bool firstTime = true;
+        foreach (RelayNode node in nodes)
+        {
+            if (!firstTime)
+            {
+                if (node.IsBase)
+                {
+                    path.terminate(node.Position);
+                }
+                else
+                {
+                    path.Add(node.Vessel);
+                }
+            }
+            else
+            {
+                firstTime = false;
+            }
+        }
+        return path;
+    }
 
     //decide whether a vessel is a comsat
     bool isComsat(Vessel v)
@@ -287,6 +315,8 @@ public class ARRemotePod : CommandPod
             }
         }
 
+        populateComsatList();
+        
         base.onPartAwake();
     }
 
@@ -327,44 +357,44 @@ public class ARRemotePod : CommandPod
 
 class RelayNode
 {
-	Vessel vessel;
-	Vector3d position;
-	
-	public RelayNode(Vessel v)
-	{
-		this.vessel = v;
-		this.position = v.transform.position;
-	}
-	
-	public RelayNode(Vector3d pos)
-	{
-		this.vessel = null;
-		this.position = pos;
-	}
-	
-	public Vessel Vessel
-	{
-		get
-		{
-			return this.vessel;
-		}	
-	}
-	
-	public Vector3d Position
-	{
-		get
-		{
-			return this.position;
-		}	
-	}
-	
-	public bool IsBase
-	{
-		get
-		{
-			return (this.vessel == null);
-		}
-	}
+    Vessel vessel;
+    Vector3d position;
+
+    public RelayNode(Vessel v)
+    {
+        this.vessel = v;
+        this.position = v.transform.position;
+    }
+
+    public RelayNode(Vector3d pos)
+    {
+        this.vessel = null;
+        this.position = pos;
+    }
+
+    public Vessel Vessel
+    {
+        get
+        {
+            return this.vessel;
+        }
+    }
+
+    public Vector3d Position
+    {
+        get
+        {
+            return this.position;
+        }
+    }
+
+    public bool IsBase
+    {
+        get
+        {
+            return (this.vessel == null);
+        }
+    }
 }
 
 public class RelayPath
