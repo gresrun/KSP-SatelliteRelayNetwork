@@ -35,7 +35,6 @@ public class ARRemotePod : CommandPod
     public double controlDelay = 0;    //round trip speed of light delay in seconds
 
     int ticksSinceContactCheck = 0;
-    List<Vessel> comsatList;
     FlightCtrlStateBuffer delayedBuffer = new FlightCtrlStateBuffer();
 
     protected override void onPartFixedUpdate()
@@ -87,33 +86,6 @@ public class ARRemotePod : CommandPod
         return true;
     }
 
-    /* ZW: populateComsatList()
-     * takes no arguments
-     * 
-     * erases old list of comsats and scans the global flight list, repopulating the list
-     * and storing it for use in the findShortestRelayPath() method.
-     */
-    void populateComsatList()
-    {
-        // purge previous list
-        if (comsatList == null)
-        {
-            comsatList = new List<Vessel>();
-        }
-        else
-        {
-            comsatList.Clear();
-        }
-        // scan global flight list, add comsats to comsatList
-        foreach (Vessel v in FlightGlobals.Vessels)
-        {
-            if (isComsat(v))
-            {
-                comsatList.Add(v);
-            }
-        }
-    }
-
     RelayPath findShortestRelayPath()
     {
         Vector3d baseRelay = computeBaseRelayPosition();
@@ -145,7 +117,7 @@ public class ARRemotePod : CommandPod
             }
             openSet.Remove(current);
             closedSet.Add(current);
-            foreach (Vessel v in comsatList)
+            foreach (Vessel v in FlightGlobals.Vessels)
             {
                 if (isComsat(v) && lineOfSight(v.transform.position, current.Position))
                 {
@@ -313,8 +285,6 @@ public class ARRemotePod : CommandPod
                 }
             }
         }
-
-        populateComsatList();
         
         base.onPartAwake();
     }
