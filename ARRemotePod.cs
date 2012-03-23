@@ -95,8 +95,8 @@ public class ARRemotePod : CommandPod
 		RelayNode start = new RelayNode(this.vessel);
 		double startBaseHeuristic = (start.Position - goal.Position).magnitude;
 		
-        ISet<RelayNode> closedSet = new HashSet<RelayNode>();
-        ISet<RelayNode> openSet = new HashSet<RelayNode>();
+        HashSet<RelayNode> closedSet = new HashSet<RelayNode>();
+        HashSet<RelayNode> openSet = new HashSet<RelayNode>();
         openSet.Add(start);
 		
 		Dictionary<RelayNode,RelayNode> cameFrom = new Dictionary<RelayNode,RelayNode>();
