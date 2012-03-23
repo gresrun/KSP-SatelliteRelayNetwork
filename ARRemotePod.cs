@@ -88,24 +88,26 @@ public class ARRemotePod : CommandPod
 
     RelayPath findShortestRelayPath()
     {
-        Vector3d baseRelay = computeBaseRelayPosition();
-
-        RelayNode goal = new RelayNode(baseRelay);
+        RelayNode goal = new RelayNode(computeBaseRelayPosition());
         RelayNode start = new RelayNode(this.vessel);
-        double startBaseHeuristic = (start.Position - goal.Position).magnitude;
 
         HashSet<RelayNode> closedSet = new HashSet<RelayNode>();
         HashSet<RelayNode> openSet = new HashSet<RelayNode>();
-        openSet.Add(start);
 
         Dictionary<RelayNode, RelayNode> cameFrom = new Dictionary<RelayNode, RelayNode>();
         Dictionary<RelayNode, double> gScore = new Dictionary<RelayNode, double>();
         Dictionary<RelayNode, double> hScore = new Dictionary<RelayNode, double>();
         Dictionary<RelayNode, double> fScore = new Dictionary<RelayNode, double>();
+
+        openSet.Add(start);
+
+        double startBaseHeuristic = (start.Position - goal.Position).magnitude;
         gScore.Add(start, 0.0);
         hScore.Add(start, startBaseHeuristic);
         fScore.Add(start, startBaseHeuristic);
 
+        List<Vessel> comsats = findComsats();
+        
         RelayPath path = null;
         while (openSet.Count > 0)
         {
@@ -117,9 +119,9 @@ public class ARRemotePod : CommandPod
             }
             openSet.Remove(current);
             closedSet.Add(current);
-            foreach (Vessel v in FlightGlobals.Vessels)
+            foreach (Vessel v in comsats)
             {
-                if (isComsat(v) && lineOfSight(v.transform.position, current.Position))
+                if (lineOfSight(v.transform.position, current.Position))
                 {
                     RelayNode neighbor = new RelayNode(v);
                     if (!closedSet.Contains(neighbor))
@@ -146,8 +148,20 @@ public class ARRemotePod : CommandPod
                 }
             }
         }
-
         return path;
+    }
+
+    List<Vessel> findComsats()
+    {
+        List<Vessel> comsats = new List<Vessel>();
+        foreach (Vessel v in FlightGlobals.Vessels)
+        {
+            if (isComsat(v))
+            {
+                comsats.Add(v);
+            }
+        }
+        return comsats;
     }
 
     List<RelayNode> reconstructPath(Dictionary<RelayNode, RelayNode> cameFrom, RelayNode curNode)
