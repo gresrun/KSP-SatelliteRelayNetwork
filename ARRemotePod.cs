@@ -111,10 +111,12 @@ public class ARRemotePod : CommandPod
         RelayPath path = null;
         while (openSet.Count > 0)
         {
-            RelayNode current = fScore.Where(p => openSet.Contains(p.Key)).Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2).Key;
+            RelayNode current = fScore.Where(p => openSet.Contains(p.Key))
+                                      .Aggregate((p1, p2) => (p1.Value < p2.Value) ? p1 : p2)
+                                      .Key;
             if (current == goal)
             {
-                path = convertToPath(reconstructPath(cameFrom, cameFrom[goal]));
+                path = convertToPath(reconstructPath(cameFrom, cameFrom[goal]), goal.Position);
                 break;
             }
             openSet.Remove(current);
@@ -169,7 +171,7 @@ public class ARRemotePod : CommandPod
         return tmp;
     }
 
-    RelayPath convertToPath(List<RelayNode> nodes)
+    RelayPath convertToPath(List<RelayNode> nodes, Vector3d goalPos)
     {
         RelayPath path = new RelayPath(nodes[0].Vessel);
         bool firstTime = true;
@@ -177,21 +179,14 @@ public class ARRemotePod : CommandPod
         {
             if (!firstTime)
             {
-                if (node.IsBase)
-                {
-                    path.terminate(node.Position);
-                    break;
-                }
-                else
-                {
-                    path.Add(node.Vessel);
-                }
+                path.Add(node.Vessel);
             }
             else
             {
                 firstTime = false;
             }
         }
+        path.terminate(goalPos);
         return path;
     }
 
