@@ -106,7 +106,7 @@ public class ARRemotePod : CommandPod
         hScore.Add(start, startBaseHeuristic);
         fScore.Add(start, startBaseHeuristic);
 
-        List<Vessel> comsats = findComsats();
+        HashSet<RelayNode> neighbors = findComsats(start, goal);
         
         RelayPath path = null;
         while (openSet.Count > 0)
@@ -119,31 +119,27 @@ public class ARRemotePod : CommandPod
             }
             openSet.Remove(current);
             closedSet.Add(current);
-            foreach (Vessel v in comsats)
+            foreach (RelayNode neighbor in neighbors)
             {
-                if (lineOfSight(v.transform.position, current.Position))
+                if (!closedSet.Contains(neighbor) && lineOfSight(neighbor.Position, current.Position))
                 {
-                    RelayNode neighbor = new RelayNode(v);
-                    if (!closedSet.Contains(neighbor))
+                    double tentGScore = gScore[current] - (neighbor.Position - current.Position).magnitude;
+                    bool tentIsBetter = false;
+                    if (!openSet.Contains(neighbor))
                     {
-                        double tentGScore = gScore[current] - (neighbor.Position - current.Position).magnitude;
-                        bool tentIsBetter = false;
-                        if (!openSet.Contains(neighbor))
-                        {
-                            openSet.Add(neighbor);
-                            hScore.Add(neighbor, (neighbor.Position - goal.Position).magnitude);
-                            tentIsBetter = true;
-                        }
-                        else if (tentGScore < gScore[neighbor])
-                        {
-                            tentIsBetter = true;
-                        }
-                        if (tentIsBetter)
-                        {
-                            cameFrom.Add(neighbor, current);
-                            gScore.Add(neighbor, tentGScore);
-                            fScore.Add(neighbor, tentGScore + hScore[neighbor]);
-                        }
+                        openSet.Add(neighbor);
+                        hScore.Add(neighbor, (neighbor.Position - goal.Position).magnitude);
+                        tentIsBetter = true;
+                    }
+                    else if (tentGScore < gScore[neighbor])
+                    {
+                        tentIsBetter = true;
+                    }
+                    if (tentIsBetter)
+                    {
+                        cameFrom.Add(neighbor, current);
+                        gScore.Add(neighbor, tentGScore);
+                        fScore.Add(neighbor, tentGScore + hScore[neighbor]);
                     }
                 }
             }
@@ -151,16 +147,10 @@ public class ARRemotePod : CommandPod
         return path;
     }
 
-    List<Vessel> findComsats()
+    HashSet<RelayNode> findComsats(RelayNode start, RelayNode goal)
     {
-        List<Vessel> comsats = new List<Vessel>();
-        foreach (Vessel v in FlightGlobals.Vessels)
-        {
-            if (isComsat(v))
-            {
-                comsats.Add(v);
-            }
-        }
+        HashSet<RelayNode> comsats = new HashSet<RelayNode>(){start, goal};
+        comsats.UnionWith(FlightGlobals.Vessels.Where(v => isComsat(v)).Select(v => new RelayNode(v)));
         return comsats;
     }
 
@@ -174,14 +164,13 @@ public class ARRemotePod : CommandPod
         }
         else
         {
-            tmp = new List<RelayNode>() { curNode };
+            tmp = new List<RelayNode>(){curNode};
         }
         return tmp;
     }
 
     RelayPath convertToPath(List<RelayNode> nodes)
     {
-        nodes.Reverse();
         RelayPath path = new RelayPath(nodes[0].Vessel);
         bool firstTime = true;
         foreach (RelayNode node in nodes)
@@ -191,6 +180,7 @@ public class ARRemotePod : CommandPod
                 if (node.IsBase)
                 {
                     path.terminate(node.Position);
+                    break;
                 }
                 else
                 {
@@ -208,7 +198,9 @@ public class ARRemotePod : CommandPod
     //decide whether a vessel is a comsat
     bool isComsat(Vessel v)
     {
-        return (v.vesselName.ToLower().Contains(comsatString) && (v.isCommandable || !v.vesselName.ToLower().Contains("debris")));
+        return (v != this.vessel && 
+                v.vesselName.ToLower().Contains(comsatString) && 
+                (v.isCommandable || !v.vesselName.ToLower().Contains("debris")));
     }
 
 
@@ -338,7 +330,7 @@ public class ARRemotePod : CommandPod
     }
 }
 
-class RelayNode
+class RelayNode : IEquatable<RelayNode>
 {
     Vessel vessel;
     Vector3d position;
@@ -377,6 +369,11 @@ class RelayNode
         {
             return (this.vessel == null);
         }
+    }
+
+    public bool Equals(RelayNode other)
+    {
+        return (this.Vessel == other.Vessel && this.Position == other.Position);
     }
 }
 
