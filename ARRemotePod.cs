@@ -70,29 +70,23 @@ public class ARRemotePod : CommandPod
     {
         Vector3d a = na.Position;
         Vector3d b = nb.Position;
-//print("LOS(?) - " + na + " → " + nb);
         foreach (CelestialBody body in FlightGlobals.Bodies)
         {
             Vector3d bodyFromA = body.position - a;
             Vector3d bFromA = b - a;
-//print("  LOS - body=" + body + " radius=" + body.Radius + " Vector3d.Dot(bodyFromA, bFromA)=" + Vector3d.Dot(bodyFromA, bFromA));
             if (Vector3d.Dot(bodyFromA, bFromA) > 0)
             {
 		Vector3d bFromAnorm = bFromA.normalized;
-//print("    LOS - Dot PASS - Vector3d.Dot(bodyFromA, bFromAnorm)=" + Vector3d.Dot(bodyFromA, bFromAnorm) + " bFromA.magnitude=" + bFromA.magnitude);
                 if (Vector3d.Dot(bodyFromA, bFromAnorm) < bFromA.magnitude)
                 { // check lateral offset from line between b and a
                     Vector3d lateralOffset = bodyFromA - Vector3d.Dot(bodyFromA, bFromAnorm) * bFromAnorm;
-//print("      LOS - mag PASS - lateralOffset.magnitude=" + lateralOffset.magnitude + " (body.Radius - 5)=" + (body.Radius - 5));
-                    if (lateralOffset.magnitude < body.Radius - 5)
+                    if (lateralOffset.magnitude < (body.Radius - 5))
                     {
-//print("        LOS - NO - " + na + " → " + body + " → " + nb);
                         return false;
                     }
                 }
             }
         }
-//print("        LOS - YES - " + na + " → " + nb);
         return true;
     }
 
