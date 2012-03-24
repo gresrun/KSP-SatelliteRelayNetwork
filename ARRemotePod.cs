@@ -65,24 +65,34 @@ public class ARRemotePod : CommandPod
 
     }
 
-    //check whether any celestial bodies block line of sight between a and b.
-    bool lineOfSight(Vector3d a, Vector3d b)
+    // check whether any celestial bodies block line of sight between a and b.
+    bool lineOfSight(RelayNode na, RelayNode nb)
     {
+        Vector3d a = na.Position;
+        Vector3d b = nb.Position;
+//print("LOS(?) - " + na + " → " + nb);
         foreach (CelestialBody body in FlightGlobals.Bodies)
         {
-            if (Vector3d.Dot(body.position - a, b - a) > 0)
+            Vector3d bodyFromA = body.position - a;
+            Vector3d bFromA = b - a;
+//print("  LOS - body=" + body + " radius=" + body.Radius + " Vector3d.Dot(bodyFromA, bFromA)=" + Vector3d.Dot(bodyFromA, bFromA));
+            if (Vector3d.Dot(bodyFromA, bFromA) > 0)
             {
-                if (Vector3d.Dot(body.position - a, (b - a).normalized) < (b - a).magnitude)
-                {
-                    //check lateral offsite from line between b and a
-                    Vector3d lateralOffset = (body.position - a) - Vector3d.Dot(body.position - a, (b - a).normalized) * (b - a).normalized;
+		Vector3d bFromAnorm = bFromA.normalized;
+//print("    LOS - Dot PASS - Vector3d.Dot(bodyFromA, bFromAnorm)=" + Vector3d.Dot(bodyFromA, bFromAnorm) + " bFromA.magnitude=" + bFromA.magnitude);
+                if (Vector3d.Dot(bodyFromA, bFromAnorm) < bFromA.magnitude)
+                { // check lateral offset from line between b and a
+                    Vector3d lateralOffset = bodyFromA - Vector3d.Dot(bodyFromA, bFromAnorm) * bFromAnorm;
+//print("      LOS - mag PASS - lateralOffset.magnitude=" + lateralOffset.magnitude + " (body.Radius - 5)=" + (body.Radius - 5));
                     if (lateralOffset.magnitude < body.Radius - 5)
                     {
+//print("        LOS - NO - " + na + " → " + body + " → " + nb);
                         return false;
                     }
                 }
             }
         }
+//print("        LOS - YES - " + na + " → " + nb);
         return true;
     }
 
@@ -102,9 +112,9 @@ public class ARRemotePod : CommandPod
         openSet.Add(start);
 
         double startBaseHeuristic = (start.Position - goal.Position).magnitude;
-        gScore.Add(start, 0.0);
-        hScore.Add(start, startBaseHeuristic);
-        fScore.Add(start, startBaseHeuristic);
+        gScore[start] = 0.0;
+        hScore[start] = startBaseHeuristic;
+        fScore[start] = startBaseHeuristic;
 
         HashSet<RelayNode> neighbors = findComsats(start, goal);
         
@@ -123,14 +133,14 @@ public class ARRemotePod : CommandPod
             closedSet.Add(current);
             foreach (RelayNode neighbor in neighbors)
             {
-                if (!closedSet.Contains(neighbor) && lineOfSight(neighbor.Position, current.Position))
+                if (!closedSet.Contains(neighbor) && lineOfSight(neighbor, current))
                 {
                     double tentGScore = gScore[current] - (neighbor.Position - current.Position).magnitude;
                     bool tentIsBetter = false;
                     if (!openSet.Contains(neighbor))
                     {
                         openSet.Add(neighbor);
-                        hScore.Add(neighbor, (neighbor.Position - goal.Position).magnitude);
+                        hScore[neighbor] = (neighbor.Position - goal.Position).magnitude;
                         tentIsBetter = true;
                     }
                     else if (tentGScore < gScore[neighbor])
@@ -139,9 +149,9 @@ public class ARRemotePod : CommandPod
                     }
                     if (tentIsBetter)
                     {
-                        cameFrom.Add(neighbor, current);
-                        gScore.Add(neighbor, tentGScore);
-                        fScore.Add(neighbor, tentGScore + hScore[neighbor]);
+                        cameFrom[neighbor] = current;
+                        gScore[neighbor] = tentGScore;
+                        fScore[neighbor] = tentGScore + hScore[neighbor];
                     }
                 }
             }
@@ -369,6 +379,11 @@ class RelayNode : IEquatable<RelayNode>
     public bool Equals(RelayNode other)
     {
         return (this.Vessel == other.Vessel && this.Position == other.Position);
+    }
+
+    public override String ToString()
+    {
+        return ((this.vessel == null) ? "Mission Control" : this.vessel.vesselName);
     }
 }
 
